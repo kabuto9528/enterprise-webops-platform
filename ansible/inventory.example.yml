@@ -1,0 +1,11 @@
+# Copy to inventory.local.yml on ops01; replace every example value locally.
+all:
+  children:
+    web:
+      hosts:
+        web01-hz:
+          ansible_host: web01.example.invalid
+          ansible_port: 22
+          ansible_user: webops-deploy
+          ansible_ssh_private_key_file: /home/ops/.ssh/webops_ansible_ed25519
+          ansible_ssh_common_args: -o UserKnownHostsFile=/home/ops/.ssh/webops_known_hosts

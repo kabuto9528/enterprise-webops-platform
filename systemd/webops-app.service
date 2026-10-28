@@ -1,0 +1,32 @@
+[Unit]
+Description=WebOps host application (stage03)
+After=network.target
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=webops-app
+Group=webops-app
+WorkingDirectory=/opt/webops/current
+EnvironmentFile=/etc/webops/webops-app.env
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/opt/webops/current/.venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --proxy-headers --forwarded-allow-ips=127.0.0.1
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=20
+KillSignal=SIGTERM
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+RestrictSUIDSGID=true
+CapabilityBoundingSet=
+UMask=0027
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=webops-app
+
+[Install]
+WantedBy=multi-user.target

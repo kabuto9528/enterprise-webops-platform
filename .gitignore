@@ -1,0 +1,26 @@
+# Local connection parameters and generated runtime files
+.local/
+.env
+.env.*
+!.env.example
+*.pem
+*.pri
+*.key
+*.p12
+*.pfx
+*_rsa
+*_ed25519
+*known_hosts*
+inventory.local.yml
+inventory.local.yaml
+credentials.xml
+secrets/
+# Build output and Python caches
+.venv/
+venv/
+__pycache__/
+.pytest_cache/
+*.pyc
+artifacts/
+dist/
+# Keep source configs, dependency locks and example inventories tracked

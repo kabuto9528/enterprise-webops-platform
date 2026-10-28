@@ -1,0 +1,53 @@
+---
+- name: Verify stage05 automation path without privileged deployment
+  hosts: web
+  gather_facts: false
+  become: false
+  tasks:
+    - name: Verify Python module transport
+      ansible.builtin.ping:
+
+    - name: Gather only Python facts
+      ansible.builtin.setup:
+        filter:
+          - ansible_python*
+        gather_subset:
+          - '!all'
+          - '!min'
+          - python
+
+    - name: Check system Python dnf bindings without installing packages
+      ansible.builtin.command:
+        argv:
+          - /usr/bin/python3
+          - -c
+          - 'import dnf, rpm; print("dnf/rpm bindings available")'
+      changed_when: false
+
+    - name: Confirm dedicated unprivileged identity
+      ansible.builtin.command: /usr/bin/id -un
+      changed_when: false
+      register: deploy_identity
+
+    - name: Require the stage05 dedicated identity
+      ansible.builtin.assert:
+        that:
+          - deploy_identity.stdout == 'webops-deploy'
+
+    - name: Write a harmless marker in the dedicated project directory
+      ansible.builtin.copy:
+        dest: '{{ webops_probe_directory }}/stage05-probe.txt'
+        content: "Stage05 Ansible transport verified.\n"
+        mode: '0640'
+
+    - name: Confirm root escalation is unavailable
+      ansible.builtin.command: sudo -n /usr/bin/id -u
+      changed_when: false
+      failed_when: root_probe.rc == 0
+      register: root_probe
+
+    - name: Confirm membership excludes privileged deployment groups
+      ansible.builtin.command: /usr/bin/id -nG
+      changed_when: false
+      register: deploy_groups
+      failed_when: "'wheel' in deploy_groups.stdout.split() or 'docker' in deploy_groups.stdout.split()"
