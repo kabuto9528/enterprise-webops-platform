@@ -1,0 +1,17 @@
+# Preparation configuration: no external integration until the user selects a recipient.
+global:
+  resolve_timeout: 5m
+route:
+  receiver: unconfigured
+  group_by: [alertname, node, category]
+  group_wait: 30s
+  group_interval: 1m
+  repeat_interval: 4h
+receivers:
+  - name: unconfigured
+inhibit_rules:
+  - source_matchers: ['severity="critical"']
+    target_matchers: ['severity="warning"']
+    equal: [node, category]
+  - source_matchers: ['alertname="BlackboxExporterDown"']
+    target_matchers: ['alertname="HttpProbeFailed"']

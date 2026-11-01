@@ -1,0 +1,91 @@
+---
+- name: Export one exact controller Git commit and deploy it
+  hosts: web
+  gather_facts: false
+  serial: 1
+  vars:
+    ansible_become: true
+  tasks:
+    - name: Validate explicit privileged access and full commit SHA
+      ansible.builtin.assert:
+        that:
+          - webops_admin_confirm | default(false) | bool
+          - ansible_user != 'webops-deploy'
+          - release_sha | default('') is match('^[0-9a-f]{40}$')
+          - not ansible_check_mode
+        fail_msg: Real deployment requires a reviewed SHA and explicit administrative inventory.
+
+    - name: Create an isolated controller export directory
+      ansible.builtin.tempfile:
+        state: directory
+        prefix: webops-export-
+      delegate_to: localhost
+      become: false
+      vars:
+        ansible_become: false
+        ansible_remote_tmp: "{{ lookup('ansible.builtin.env', 'ANSIBLE_LOCAL_TEMP') | default('~/.ansible/tmp', true) }}"
+      register: export_directory
+
+    - name: Export, verify and upload exactly one commit
+      block:
+        - name: Verify that the exact commit exists
+          ansible.builtin.command:
+            argv: [git, -C, '{{ playbook_dir }}/..', rev-parse, --verify, '{{ release_sha }}^{commit}']
+          delegate_to: localhost
+          become: false
+          vars:
+            ansible_become: false
+            ansible_remote_tmp: "{{ lookup('ansible.builtin.env', 'ANSIBLE_LOCAL_TEMP') | default('~/.ansible/tmp', true) }}"
+          changed_when: false
+          register: exported_commit
+          failed_when: exported_commit.rc != 0 or exported_commit.stdout != release_sha
+
+        - name: Export tracked contents only
+          ansible.builtin.command:
+            argv: [git, -C, '{{ playbook_dir }}/..', archive, --format=tar,
+                   '--output={{ export_directory.path }}/source.tar', '{{ release_sha }}']
+          delegate_to: localhost
+          become: false
+          vars:
+            ansible_become: false
+            ansible_remote_tmp: "{{ lookup('ansible.builtin.env', 'ANSIBLE_LOCAL_TEMP') | default('~/.ansible/tmp', true) }}"
+          changed_when: true
+
+        - name: Compute the controller archive checksum
+          ansible.builtin.stat:
+            path: '{{ export_directory.path }}/source.tar'
+            checksum_algorithm: sha256
+          delegate_to: localhost
+          become: false
+          vars:
+            ansible_become: false
+            ansible_remote_tmp: "{{ lookup('ansible.builtin.env', 'ANSIBLE_LOCAL_TEMP') | default('~/.ansible/tmp', true) }}"
+          register: source_archive
+
+        - name: Upload the archive into a root-owned project directory
+          ansible.builtin.copy:
+            src: '{{ export_directory.path }}/source.tar'
+            dest: '/var/lib/webops-release/incoming/{{ release_sha }}.tar'
+            owner: root
+            group: root
+            mode: '0600'
+
+        - name: Build, switch, check and recover on failure
+          ansible.builtin.command:
+            argv: [/usr/local/sbin/webops-release, deploy, '{{ release_sha }}',
+                   --archive, '/var/lib/webops-release/incoming/{{ release_sha }}.tar',
+                   --archive-sha256, '{{ source_archive.stat.checksum }}']
+          # Recovery and health have their own finite bounds; retain the remote job ID.
+          async: 3600
+          poll: 5
+          changed_when: true
+      always:
+        - name: Remove only the temporary controller export
+          ansible.builtin.file:
+            path: '{{ export_directory.path }}'
+            state: absent
+          delegate_to: localhost
+          become: false
+          vars:
+            ansible_become: false
+            ansible_remote_tmp: "{{ lookup('ansible.builtin.env', 'ANSIBLE_LOCAL_TEMP') | default('~/.ansible/tmp', true) }}"

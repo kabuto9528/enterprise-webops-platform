@@ -1,0 +1,34 @@
+[Unit]
+Description=WebOps Alertmanager
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=webops-alertmanager
+Group=webops-alertmanager
+ExecStart=/opt/webops-monitoring/alertmanager-0.34.2.linux-amd64/alertmanager --config.file=/etc/webops-monitoring/alertmanager/alertmanager.yml --storage.path=/var/lib/webops-monitoring/alertmanager --data.retention=120h --web.listen-address=127.0.0.1:9093 --cluster.listen-address=
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+UMask=0077
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/webops-monitoring/alertmanager
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+MemoryMax=128M
+CPUQuota=30%
+TasksMax=64
+# Delivery errors can contain receiver URLs. Inspect locally, never export raw journal.
+StandardOutput=null
+StandardError=null
+
+[Install]
+WantedBy=multi-user.target

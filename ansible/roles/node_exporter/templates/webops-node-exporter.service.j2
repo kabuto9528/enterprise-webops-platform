@@ -1,0 +1,24 @@
+[Unit]
+Description=WebOps node_exporter {{ node_exporter_version }} (stage07)
+After=network.target
+
+[Service]
+User=webops-node-exporter
+Group=webops-node-exporter
+ExecStart={{ node_exporter_root }}/node_exporter-{{ node_exporter_version }}.linux-amd64/node_exporter --web.listen-address={{ node_exporter_listen }}
+Restart=on-failure
+RestartSec=5s
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

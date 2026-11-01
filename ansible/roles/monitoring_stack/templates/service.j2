@@ -1,0 +1,38 @@
+[Unit]
+Description=WebOps {{ item.name }} (stage08)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User={{ item.user }}
+Group={{ item.user }}
+{% if item.name == 'prometheus' %}
+ExecStart={{ stack_root }}/{{ stack_lock.prometheus.directory }}/prometheus --config.file={{ stack_config }}/prometheus/prometheus.yml --storage.tsdb.path={{ stack_data }}/prometheus --storage.tsdb.retention.time=7d --storage.tsdb.retention.size=2GB --web.listen-address=127.0.0.1:9090
+{% elif item.name == 'blackbox' %}
+ExecStart={{ stack_root }}/{{ stack_lock.blackbox.directory }}/blackbox_exporter --config.file={{ stack_config }}/blackbox/blackbox.yml --web.listen-address=127.0.0.1:9115
+{% else %}
+WorkingDirectory={{ stack_root }}/{{ stack_lock.grafana.directory }}
+ExecStart={{ stack_root }}/{{ stack_lock.grafana.directory }}/bin/grafana server --homepath={{ stack_root }}/{{ stack_lock.grafana.directory }} --config={{ stack_config }}/grafana/grafana.ini
+{% endif %}
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=60
+UMask=0027
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths={{ stack_data }}/{{ item.name }}
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+MemoryMax={{ item.memory }}
+CPUQuota={{ item.cpu }}
+TasksMax=128
+
+[Install]
+WantedBy=multi-user.target

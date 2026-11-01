@@ -1,0 +1,14 @@
+# Stage06 administrative inventory. Copy locally; never add credentials to Git.
+# No credentials or privileges are inherited from stage05's webops-deploy user.
+all:
+  children:
+    web:
+      hosts:
+        web01-hz:
+          ansible_host: web01.example.invalid
+          ansible_user: example-authorized-admin
+          ansible_ssh_private_key_file: /home/ops/.ssh/example_admin_ed25519
+          ansible_ssh_common_args: -o UserKnownHostsFile=/home/ops/.ssh/webops_known_hosts
+          webops_admin_confirm: true
+          # Supply after reading and reviewing the actual project configuration.
+          webops_adopt_nginx_sha256: REPLACE_WITH_REVIEWED_SHA256

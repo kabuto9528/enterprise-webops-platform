@@ -13,6 +13,10 @@
 *known_hosts*
 inventory.local.yml
 inventory.local.yaml
+inventory.admin.local.yml
+inventory.admin.local.yaml
+inventory*.local.yml
+inventory*.local.yaml
 credentials.xml
 secrets/
 # Build output and Python caches
@@ -23,4 +27,37 @@ __pycache__/
 *.pyc
 artifacts/
 dist/
+build/
 # Keep source configs, dependency locks and example inventories tracked
+
+# Internal learning records and deployment evidence stay local
+docs/worklogs/
+docs/evidence/
+docs/stages/
+docs/nodes/
+docs/drills/
+docs/交付/
+docs/runbooks/
+docs/执行约定.md
+docs/开发状态.md
+docs/验收索引.md
+docs/运维契约.md
+docs/决策记录.md
+docs/开发与连接方案.md
+docs/简历与讲解.md
+enterprise_webops_codex_handoff.md
+Enterprise_WebOps_分阶段开发文档_新聊天提示词版.md
+*.log
+*.jsonl
+*.bundle
+*.tar
+*.tar.gz
+*.zip
+*.whl
+*.rpm
+*.jpi
+*.hpi
+*.sqlite
+*.sqlite3
+*.db
+*.pub

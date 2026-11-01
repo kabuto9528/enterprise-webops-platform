@@ -1,0 +1,8 @@
+---
+- name: Restart monitoring stack
+  ansible.builtin.systemd_service:
+    name: "webops-{{ item.name }}"
+    daemon_reload: true
+    enabled: true
+    state: restarted
+  loop: "{{ stack_services }}"

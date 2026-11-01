@@ -1,0 +1,21 @@
+Host webops
+    HostName {{ metrics_cloud_host }}
+    Port 22
+    User webops-metrics
+    IdentityFile /var/lib/webops-metrics-tunnel/.ssh/id_ed25519
+    UserKnownHostsFile /var/lib/webops-metrics-tunnel/.ssh/known_hosts
+    StrictHostKeyChecking yes
+{% if metrics_cloud_host_key_alias is defined %}
+    HostKeyAlias {{ metrics_cloud_host_key_alias }}
+{% endif %}
+    IdentitiesOnly yes
+    BatchMode yes
+    ForwardAgent no
+    RequestTTY no
+    ExitOnForwardFailure yes
+    ServerAliveInterval 15
+    ServerAliveCountMax 2
+    TCPKeepAlive yes
+    ConnectTimeout 10
+    ConnectionAttempts 1
+    LocalForward 127.0.0.1:19100 127.0.0.1:9100

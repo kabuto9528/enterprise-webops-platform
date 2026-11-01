@@ -1,0 +1,24 @@
+---
+- name: Configure only the monitor01 metrics endpoints
+  hosts: monitor01
+  gather_facts: false
+  become: true
+  pre_tasks:
+    - name: Require explicit local monitor authorization
+      ansible.builtin.assert:
+        that:
+          - webops_monitoring_admin_confirm | default(false) | bool
+          - node_exporter_listen == '127.0.0.1:9100'
+          - ansible_user == 'monitor'
+    - name: Install only baseline tools
+      ansible.builtin.dnf:
+        name: [git, curl, chrony, openssh-clients]
+        state: present
+    - name: Keep time synchronization running
+      ansible.builtin.systemd_service:
+        name: chronyd
+        enabled: true
+        state: started
+  roles:
+    - node_exporter
+    - metrics_tunnel_client

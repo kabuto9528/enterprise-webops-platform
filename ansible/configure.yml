@@ -1,0 +1,18 @@
+---
+- name: Adopt only the verified project configuration
+  hosts: web
+  gather_facts: false
+  vars:
+    ansible_become: true
+  pre_tasks:
+    - name: Require a separate explicit administrative inventory
+      ansible.builtin.assert:
+        that:
+          - webops_admin_confirm | default(false) | bool
+          - ansible_user != 'webops-deploy'
+        fail_msg: Use an authorized admin inventory; do not broaden the stage05 account.
+  roles:
+    - project_base
+    - project_docker
+    - project_nginx
+    - project_release

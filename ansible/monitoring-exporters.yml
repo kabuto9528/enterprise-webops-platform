@@ -1,0 +1,18 @@
+---
+- name: Install only the stage07 node exporters
+  hosts: metrics_nodes
+  gather_facts: false
+  become: true
+  pre_tasks:
+    - name: Require explicit administrator authorization
+      ansible.builtin.assert:
+        that:
+          - webops_monitoring_admin_confirm | default(false) | bool
+          - inventory_hostname in ['ops01', 'monitor01', 'web01-hz']
+          - ansible_user != 'webops-deploy'
+          - node_exporter_listen is defined
+          - (inventory_hostname == 'ops01') or (node_exporter_listen == '127.0.0.1:9100')
+          - (inventory_hostname != 'ops01') or (monitor01_source_ipv4 is defined)
+          - (inventory_hostname != 'ops01') or (node_exporter_ops_firewall_reviewed | default(false) | bool)
+  roles:
+    - node_exporter

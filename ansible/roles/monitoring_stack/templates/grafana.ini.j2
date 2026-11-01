@@ -1,0 +1,31 @@
+[paths]
+data = {{ stack_data }}/grafana
+logs = {{ stack_data }}/grafana/log
+plugins = {{ stack_data }}/grafana/plugins
+provisioning = {{ stack_config }}/grafana/provisioning
+[server]
+http_addr = 127.0.0.1
+http_port = 3000
+domain = localhost
+[security]
+admin_user = webops-admin
+admin_password = $__file{/etc/webops-monitoring/grafana/admin-password}
+secret_key = $__file{/etc/webops-monitoring/grafana/admin-password}
+disable_gravatar = true
+[users]
+allow_sign_up = false
+[auth.anonymous]
+enabled = false
+[analytics]
+reporting_enabled = false
+check_for_updates = false
+check_for_plugin_updates = false
+[log]
+mode = console
+[plugins]
+preinstall_disabled = true
+preinstall_auto_update = false
+plugin_admin_enabled = false
+disable_plugins = cloudwatch,elasticsearch,grafana-postgresql-datasource,grafana-pyroscope-datasource,influxdb,jaeger,loki,mssql,mysql,opentsdb,stackdriver,zipkin,tempo,grafana-pyroscope-app,grafana-exploretraces-app,grafana-lokiexplore-app,grafana-metricsdrilldown-app,grafana-assistant-app,grafana-pathfinder-app
+[unified_alerting]
+enabled = false

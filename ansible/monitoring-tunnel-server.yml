@@ -1,0 +1,15 @@
+---
+- name: Authorize only the metrics forwarding account
+  hosts: web
+  gather_facts: false
+  become: true
+  pre_tasks:
+    - name: Require an administrator and verified tunnel inputs
+      ansible.builtin.assert:
+        that:
+          - webops_admin_confirm | default(false) | bool
+          - ansible_user != 'webops-deploy'
+          - metrics_tunnel_public_key is match('^ssh-ed25519 [A-Za-z0-9+/=]+ ')
+          - metrics_tunnel_source_ipv4 is match('^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$')
+  roles:
+    - metrics_tunnel_server

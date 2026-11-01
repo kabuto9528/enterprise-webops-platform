@@ -1,0 +1,11 @@
+# Only application source and the locked runtime dependencies enter the image.
+**
+!Dockerfile
+!requirements.txt
+!docker/
+!docker/runtime-requirements.lock.txt
+!app/
+!app/**
+app/**/__pycache__/
+app/**/*.py[cod]
+app/**/.env

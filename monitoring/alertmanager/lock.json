@@ -1,0 +1,9 @@
+{
+  "version": "0.34.2",
+  "directory": "alertmanager-0.34.2.linux-amd64",
+  "file": "alertmanager-0.34.2.linux-amd64.tar.gz",
+  "url": "https://github.com/prometheus/alertmanager/releases/download/v0.34.2/alertmanager-0.34.2.linux-amd64.tar.gz",
+  "sha256": "17ee14acd0f6ba6e25a436ff223d9c17ddd5cf484f543ad12f0932eaa89ba186",
+  "verified_on": "2026-10-30",
+  "source": "https://prometheus.io/download/"
+}

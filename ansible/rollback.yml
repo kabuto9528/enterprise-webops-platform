@@ -1,0 +1,22 @@
+---
+- name: Restore a saved known healthy project version
+  hosts: web
+  gather_facts: false
+  serial: 1
+  vars:
+    ansible_become: true
+  tasks:
+    - name: Validate explicit access and a full saved SHA
+      ansible.builtin.assert:
+        that:
+          - webops_admin_confirm | default(false) | bool
+          - ansible_user != 'webops-deploy'
+          - release_sha | default('') is match('^[0-9a-f]{40}$')
+          - not ansible_check_mode
+
+    - name: Restore the saved immutable image and verify both HTTP entrances
+      ansible.builtin.command:
+        argv: [/usr/local/sbin/webops-release, rollback, '{{ release_sha }}']
+      async: 1800
+      poll: 5
+      changed_when: true

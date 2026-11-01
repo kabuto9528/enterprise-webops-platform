@@ -1,0 +1,11 @@
+apiVersion: 1
+providers:
+  - name: WebOps
+    orgId: 1
+    folder: WebOps
+    type: file
+    disableDeletion: true
+    editable: false
+    updateIntervalSeconds: 30
+    options:
+      path: /etc/webops-monitoring/grafana/dashboards

@@ -1,0 +1,25 @@
+[Unit]
+Description=WebOps restricted metrics SSH tunnel (stage07)
+Wants=network-online.target
+After=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+User=webops-metrics-tunnel
+Group=webops-metrics-tunnel
+ExecStart=/opt/webops-monitoring/bin/webops-metrics-tunnel
+Restart=always
+RestartSec=15s
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+CapabilityBoundingSet=
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

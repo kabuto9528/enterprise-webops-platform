@@ -1,0 +1,46 @@
+groups:
+  - name: webops-baseline
+    interval: 30s
+    rules:
+      - alert: NodeExporterDown
+        expr: (up{job="node"} == 0) or absent(up{job="node",node="monitor01"}) or absent(up{job="node",node="ops01"}) or absent(up{job="node",node="web01-hz"})
+        for: 2m
+        labels: {severity: critical, category: node-reachability}
+        annotations:
+          summary: 'Node metrics unavailable: {{ $labels.node }}'
+      - alert: HttpProbeFailed
+        expr: (probe_success{job="http_health"} == 0) or absent(probe_success{job="http_health"})
+        for: 2m
+        labels: {severity: critical, category: http, node: web01-hz}
+        annotations:
+          summary: 'Cloud HTTP health probe failed'
+      - alert: BlackboxExporterDown
+        expr: (up{job="blackbox"} == 0) or absent(up{job="blackbox"})
+        for: 2m
+        labels: {severity: critical, category: probe-collector, node: monitor01}
+        annotations:
+          summary: 'HTTP probe collector unavailable'
+      - alert: DiskSpaceLow
+        expr: node_filesystem_avail_bytes{job="node",mountpoint="/",fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes{job="node",mountpoint="/",fstype!~"tmpfs|overlay"} < 0.15
+        for: 10m
+        labels: {severity: warning, category: disk}
+        annotations:
+          summary: 'Root filesystem available space below 15%: {{ $labels.node }}'
+      - alert: DiskSpaceCritical
+        expr: node_filesystem_avail_bytes{job="node",mountpoint="/",fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes{job="node",mountpoint="/",fstype!~"tmpfs|overlay"} < 0.08
+        for: 5m
+        labels: {severity: critical, category: disk}
+        annotations:
+          summary: 'Root filesystem available space below 8%: {{ $labels.node }}'
+      - alert: MemoryLow
+        expr: node_memory_MemAvailable_bytes{job="node"} / node_memory_MemTotal_bytes{job="node"} < 0.15
+        for: 5m
+        labels: {severity: warning, category: memory}
+        annotations:
+          summary: 'Available memory below 15%: {{ $labels.node }}'
+      - alert: MemoryCritical
+        expr: node_memory_MemAvailable_bytes{job="node"} / node_memory_MemTotal_bytes{job="node"} < 0.08
+        for: 2m
+        labels: {severity: critical, category: memory}
+        annotations:
+          summary: 'Available memory below 8%: {{ $labels.node }}'

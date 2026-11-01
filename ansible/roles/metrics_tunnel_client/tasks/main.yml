@@ -1,0 +1,116 @@
+---
+- name: Require a separately generated monitor-local tunnel key
+  ansible.builtin.assert:
+    that:
+      - metrics_tunnel_key_source is defined
+      - metrics_cloud_known_hosts_source is defined
+      - metrics_cloud_host is defined
+
+- name: Create the local tunnel service identity
+  ansible.builtin.user:
+    name: webops-metrics-tunnel
+    system: true
+    create_home: true
+    home: /var/lib/webops-metrics-tunnel
+    shell: /sbin/nologin
+
+- name: Restrict the service key directory
+  ansible.builtin.file:
+    path: /var/lib/webops-metrics-tunnel/.ssh
+    state: directory
+    owner: webops-metrics-tunnel
+    group: webops-metrics-tunnel
+    mode: '0700'
+
+- name: Install the key locally without retrieving its private material
+  ansible.builtin.copy:
+    src: '{{ metrics_tunnel_key_source }}'
+    dest: /var/lib/webops-metrics-tunnel/.ssh/id_ed25519
+    remote_src: true
+    owner: webops-metrics-tunnel
+    group: webops-metrics-tunnel
+    mode: '0600'
+  no_log: true
+  notify: Restart metrics tunnel
+
+- name: Install the pinned cloud host key
+  ansible.builtin.copy:
+    src: '{{ metrics_cloud_known_hosts_source }}'
+    dest: /var/lib/webops-metrics-tunnel/.ssh/known_hosts
+    remote_src: true
+    owner: webops-metrics-tunnel
+    group: webops-metrics-tunnel
+    mode: '0600'
+  notify: Restart metrics tunnel
+
+- name: Create the root-owned metrics configuration directory
+  ansible.builtin.file:
+    path: /etc/webops-monitoring
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Configure the explicit loopback-only forward
+  ansible.builtin.template:
+    src: tunnel.conf.j2
+    dest: /etc/webops-monitoring/tunnel.conf
+    owner: root
+    group: root
+    mode: '0644'
+    backup: true
+  notify: Restart metrics tunnel
+
+- name: Create a root-owned generic service entry directory
+  ansible.builtin.file:
+    path: /opt/webops-monitoring/bin
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Install the fixed SSH service entry wrapper
+  ansible.builtin.template:
+    src: webops-metrics-tunnel-wrapper.j2
+    dest: /opt/webops-monitoring/bin/webops-metrics-tunnel
+    owner: root
+    group: root
+    mode: '0755'
+    backup: true
+  notify: Restart metrics tunnel
+
+- name: Restore the distribution-defined wrapper labels
+  ansible.builtin.command: restorecon -RF /opt/webops-monitoring/bin
+  changed_when: false
+
+- name: Install tunnel supervision and retry backoff
+  ansible.builtin.template:
+    src: webops-metrics-tunnel.service.j2
+    dest: /etc/systemd/system/webops-metrics-tunnel.service
+    owner: root
+    group: root
+    mode: '0644'
+    backup: true
+  notify: Restart metrics tunnel
+
+- name: Apply changed tunnel settings
+  ansible.builtin.meta: flush_handlers
+
+- name: Enable the tunnel
+  ansible.builtin.systemd_service:
+    name: webops-metrics-tunnel
+    daemon_reload: true
+    enabled: true
+    state: started
+
+- name: Require the forwarded cloud exporter to respond
+  ansible.builtin.uri:
+    url: http://127.0.0.1:19100/metrics
+    status_code: 200
+    return_content: true
+  register: tunnel_metrics
+  failed_when: "'node_uname_info{' not in tunnel_metrics.content"
+  retries: 4
+  delay: 5
+  until: tunnel_metrics.status | default(0) == 200
+  no_log: true

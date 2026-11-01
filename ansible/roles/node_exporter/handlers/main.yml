@@ -1,0 +1,6 @@
+---
+- name: Restart exporter
+  ansible.builtin.systemd_service:
+    name: webops-node-exporter
+    daemon_reload: true
+    state: restarted

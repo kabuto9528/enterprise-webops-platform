@@ -1,0 +1,79 @@
+---
+- name: Create a private SSH recovery directory
+  ansible.builtin.file:
+    path: /var/lib/webops-stage07/ssh-before
+    state: directory
+    owner: root
+    group: root
+    mode: '0700'
+
+- name: Preserve the original SSH configuration before first change
+  ansible.builtin.command:
+    argv:
+      - /bin/sh
+      - -c
+      - cp -a /etc/ssh/sshd_config /etc/ssh/sshd_config.d /var/lib/webops-stage07/ssh-before/
+    creates: /var/lib/webops-stage07/ssh-before/sshd_config
+
+- name: Create a tunnel-only cloud identity without a usable password
+  ansible.builtin.user:
+    name: webops-metrics
+    system: true
+    create_home: true
+    home: /var/lib/webops-metrics
+    shell: /sbin/nologin
+    password: '*'
+
+- name: Create the dedicated authorization directory
+  ansible.builtin.file:
+    path: /var/lib/webops-metrics/.ssh
+    state: directory
+    owner: webops-metrics
+    group: webops-metrics
+    mode: '0700'
+
+- name: Restrict the unique key to the observed source and destination
+  ansible.builtin.copy:
+    dest: /var/lib/webops-metrics/.ssh/authorized_keys
+    content: 'from="{{ metrics_tunnel_source_ipv4 }}/32",restrict,port-forwarding,permitopen="127.0.0.1:9100" {{ metrics_tunnel_public_key }}
+'
+    owner: webops-metrics
+    group: webops-metrics
+    mode: '0600'
+    backup: true
+
+- name: Apply only the dedicated account SSH restrictions
+  block:
+    - name: Write the narrow Match drop-in
+      ansible.builtin.template:
+        src: 60-webops-metrics.conf.j2
+        dest: /etc/ssh/sshd_config.d/60-webops-metrics.conf
+        owner: root
+        group: root
+        mode: '0600'
+        backup: true
+      register: tunnel_sshd
+    - name: Validate the complete SSH configuration
+      ansible.builtin.command: /usr/sbin/sshd -t
+      changed_when: false
+    - name: Reload SSH after a configuration change
+      ansible.builtin.systemd_service:
+        name: sshd
+        state: reloaded
+      when: tunnel_sshd.changed
+  rescue:
+    - name: Restore the preceding drop-in when present
+      ansible.builtin.copy:
+        src: '{{ tunnel_sshd.backup_file }}'
+        dest: /etc/ssh/sshd_config.d/60-webops-metrics.conf
+        remote_src: true
+        mode: '0600'
+      when: tunnel_sshd.backup_file is defined
+    - name: Remove only a newly introduced invalid drop-in
+      ansible.builtin.file:
+        path: /etc/ssh/sshd_config.d/60-webops-metrics.conf
+        state: absent
+      when: tunnel_sshd.backup_file is not defined
+    - name: Stop with the failed SSH validation recorded
+      ansible.builtin.fail:
+        msg: SSH validation failed; the previous drop-in was restored. Inspect before retrying.

@@ -1,0 +1,35 @@
+---
+- name: Verify the pinned Nginx package
+  ansible.builtin.command: rpm -q --qf '%{VERSION}-%{RELEASE}' nginx
+  register: project_nginx
+  changed_when: false
+  failed_when: project_nginx.stdout != '1.26.3-15.el10'
+
+- name: Verify the existing Nginx configuration before adoption
+  ansible.builtin.command: nginx -t
+  changed_when: false
+
+- name: Read the project virtual host checksum
+  ansible.builtin.stat:
+    path: /etc/nginx/conf.d/webops-app.conf
+    checksum_algorithm: sha256
+  register: project_vhost
+
+- name: Refuse unreviewed configuration replacement
+  ansible.builtin.assert:
+    that:
+      - webops_adopt_nginx_sha256 is defined
+      - project_vhost.stat.isreg | default(false)
+      - project_vhost.stat.checksum == webops_adopt_nginx_sha256
+    fail_msg: Inspect the live project vhost and explicitly supply its approved checksum.
+
+- name: Verify the expected accepted container upstream
+  ansible.builtin.command:
+    argv: [grep, -F, 'proxy_pass http://127.0.0.1:18080;', /etc/nginx/conf.d/webops-app.conf]
+  changed_when: false
+
+- name: Keep the accepted edge service running
+  ansible.builtin.systemd_service:
+    name: nginx
+    enabled: true
+    state: started

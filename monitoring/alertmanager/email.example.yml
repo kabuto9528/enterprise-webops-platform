@@ -1,0 +1,30 @@
+# EXAMPLE ONLY. Replace placeholders locally on monitor01; never commit the real file.
+# STARTTLS example. For port 465 use force_implicit_tls: true (supported by 0.34.2).
+global:
+  resolve_timeout: 5m
+  smtp_smarthost: 'smtp.example.invalid:587'
+  smtp_from: 'sender@example.invalid'
+  smtp_auth_username: 'sender@example.invalid'
+  smtp_auth_password_file: /etc/webops-monitoring/alertmanager/secrets/smtp-password
+  smtp_require_tls: true
+route:
+  receiver: authorized-external
+  group_by: [alertname, node, category]
+  group_wait: 30s
+  group_interval: 1m
+  repeat_interval: 4h
+receivers:
+  - name: authorized-external
+    email_configs:
+      - to: 'USER_MUST_SELECT@example.invalid'
+        send_resolved: true
+        force_implicit_tls: false
+        headers:
+          Subject: '[WebOps {{ .Status }}] {{ .CommonLabels.alertname }} {{ .CommonLabels.node }}'
+        text: '{{ range .Alerts }}{{ .Status }} {{ .Labels.alertname }} node={{ .Labels.node }} severity={{ .Labels.severity }} starts={{ .StartsAt }} ends={{ .EndsAt }} {{ .Annotations.summary }}{{ "\n" }}{{ end }}'
+inhibit_rules:
+  - source_matchers: ['severity="critical"']
+    target_matchers: ['severity="warning"']
+    equal: [node, category]
+  - source_matchers: ['alertname="BlackboxExporterDown"']
+    target_matchers: ['alertname="HttpProbeFailed"']

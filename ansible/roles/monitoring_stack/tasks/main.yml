@@ -1,0 +1,164 @@
+---
+- name: Create separate service accounts
+  ansible.builtin.user:
+    name: "{{ item.user }}"
+    system: true
+    shell: /sbin/nologin
+    create_home: false
+  loop: "{{ stack_services }}"
+
+- name: Create traversable root owned persistent data parent
+  ansible.builtin.file:
+    path: "{{ stack_data }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Create persistent service directories
+  ansible.builtin.file:
+    path: "{{ stack_data }}/{{ item.name }}"
+    state: directory
+    owner: "{{ item.user }}"
+    group: "{{ item.user }}"
+    mode: '0750'
+  loop: "{{ stack_services }}"
+
+- name: Create root managed directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+  loop:
+    - "{{ stack_root }}"
+    - "{{ stack_config }}/prometheus"
+    - "{{ stack_config }}/blackbox"
+    - "{{ stack_config }}/grafana/provisioning/datasources"
+    - "{{ stack_config }}/grafana/provisioning/dashboards"
+    - "{{ stack_config }}/grafana/dashboards"
+
+- name: Hash each official archive before installation
+  ansible.builtin.stat:
+    path: "{{ stack_assets }}/{{ item.value.file }}"
+    checksum_algorithm: sha256
+  loop: "{{ stack_lock | dict2items }}"
+  register: stack_archives
+
+- name: Require exact official checksums
+  ansible.builtin.assert:
+    that: item.stat.checksum == item.item.value.sha256
+  loop: "{{ stack_archives.results }}"
+  loop_control:
+    label: "{{ item.item.key }}"
+
+- name: Extract versioned archives
+  ansible.builtin.unarchive:
+    src: "{{ stack_assets }}/{{ item.value.file }}"
+    dest: "{{ stack_root }}"
+    remote_src: true
+    owner: root
+    group: root
+    creates: "{{ stack_root }}/{{ item.value.directory }}"
+  loop: "{{ stack_lock | dict2items }}"
+
+- name: Generate nondefault Grafana password locally once
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/python3
+      - -c
+      - "import os,secrets; p='{{ stack_config }}/grafana/admin-password'; fd=os.open(p,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600); os.write(fd,secrets.token_urlsafe(36).encode()); os.close(fd)"
+    creates: "{{ stack_config }}/grafana/admin-password"
+  no_log: true
+
+- name: Limit password access to the Grafana service
+  ansible.builtin.file:
+    path: "{{ stack_config }}/grafana/admin-password"
+    owner: webops-grafana
+    group: webops-grafana
+    mode: '0400'
+
+- name: Render Prometheus config and validate on the server
+  ansible.builtin.template:
+    src: "{{ playbook_dir }}/../monitoring/prometheus/prometheus.yml.j2"
+    dest: "{{ stack_config }}/prometheus/prometheus.yml"
+    owner: root
+    group: webops-prometheus
+    mode: '0640'
+    backup: true
+    validate: "{{ stack_root }}/{{ stack_lock.prometheus.directory }}/promtool check config %s"
+  notify: Restart monitoring stack
+
+- name: Install blackbox HTTP module
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../monitoring/blackbox/blackbox.yml"
+    dest: "{{ stack_config }}/blackbox/blackbox.yml"
+    owner: root
+    group: webops-blackbox
+    mode: '0640'
+    backup: true
+  notify: Restart monitoring stack
+
+- name: Install Grafana configuration
+  ansible.builtin.template:
+    src: grafana.ini.j2
+    dest: "{{ stack_config }}/grafana/grafana.ini"
+    owner: root
+    group: webops-grafana
+    mode: '0640'
+    backup: true
+  notify: Restart monitoring stack
+
+- name: Provision datasource and dashboard
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../monitoring/grafana/{{ item.src }}"
+    dest: "{{ stack_config }}/grafana/{{ item.dest }}"
+    owner: root
+    group: webops-grafana
+    mode: '0640'
+    backup: true
+  loop:
+    - {src: datasource.yml, dest: provisioning/datasources/prometheus.yml}
+    - {src: dashboards.yml, dest: provisioning/dashboards/webops.yml}
+    - {src: webops-overview.json, dest: dashboards/webops-overview.json}
+  notify: Restart monitoring stack
+
+- name: Install restricted native services
+  ansible.builtin.template:
+    src: service.j2
+    dest: "/etc/systemd/system/webops-{{ item.name }}.service"
+    owner: root
+    group: root
+    mode: '0644'
+    backup: true
+  loop: "{{ stack_services }}"
+  notify: Restart monitoring stack
+
+- name: Apply existing SELinux file context defaults
+  ansible.builtin.command:
+    argv: [restorecon, -RF, "{{ stack_root }}", "{{ stack_config }}", "{{ stack_data }}"]
+  changed_when: false
+
+- name: Apply config before readiness checks
+  ansible.builtin.meta: flush_handlers
+
+- name: Enable persistent services
+  ansible.builtin.systemd_service:
+    name: "webops-{{ item.name }}"
+    daemon_reload: true
+    enabled: true
+    state: started
+  loop: "{{ stack_services }}"
+
+- name: Check local service readiness
+  ansible.builtin.uri:
+    url: "{{ item }}"
+    status_code: 200
+  register: stack_ready
+  retries: 20
+  delay: 3
+  until: stack_ready.status == 200
+  loop:
+    - http://127.0.0.1:9090/-/ready
+    - http://127.0.0.1:3000/api/health

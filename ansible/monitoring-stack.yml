@@ -1,0 +1,28 @@
+---
+- name: Deploy stage08 persistent monitoring on monitor01 only
+  hosts: monitor01
+  connection: local
+  gather_facts: true
+  become: true
+  vars:
+    stack_lock: "{{ lookup('file', playbook_dir + '/../monitoring/stack.lock.json') | from_json }}"
+    stack_root: /opt/webops-monitoring
+    stack_config: /etc/webops-monitoring
+    stack_data: /var/lib/webops-monitoring
+    stack_assets: "{{ playbook_dir }}/../downloads"
+    stack_services:
+      - {name: prometheus, user: webops-prometheus, memory: 512M, cpu: '80%'}
+      - {name: blackbox, user: webops-blackbox, memory: 96M, cpu: '20%'}
+      - {name: grafana, user: webops-grafana, memory: 384M, cpu: '70%'}
+  pre_tasks:
+    - name: Require exact target and private endpoints
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.hostname == 'monitor01'
+          - ansible_facts.architecture == 'x86_64'
+          - ansible_facts.distribution == 'CentOS'
+          - ansible_facts.memtotal_mb >= 1500
+          - ops_metrics_target is match('^[0-9.]+:9100$')
+          - cloud_health_url is match('^http://[0-9.]+/healthz$')
+  roles:
+    - monitoring_stack

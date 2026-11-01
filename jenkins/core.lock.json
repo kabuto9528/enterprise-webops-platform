@@ -1,0 +1,10 @@
+{
+  "version": "2.580.2",
+  "release": "1",
+  "filename": "jenkins-2.580.2-1.noarch.rpm",
+  "url": "https://pkg.jenkins.io/rpm-stable/jenkins-2.580.2-1.noarch.rpm",
+  "sha256": "de12157e24c4ab9deb821f13982051d4ab5f284011d5904815404cfc08422a6f",
+  "metadata": "https://pkg.jenkins.io/rpm-stable/repodata/repomd.xml",
+  "repositoryKeyUrl": "https://pkg.jenkins.io/rpm-stable/repodata/repomd.xml.key",
+  "repositoryKeySha256": "d3b7e4096fed593eebdba3a2554c8cb9aafebe736910584e69e924b143e7b3d4"
+}

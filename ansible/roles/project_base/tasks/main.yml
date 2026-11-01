@@ -1,0 +1,25 @@
+---
+- name: Verify existing tools without changing system packages
+  ansible.builtin.command:
+    argv: [rpm, -q, python3, git, curl, tar, util-linux]
+  changed_when: false
+
+- name: Require the expected target identity
+  ansible.builtin.command: hostname
+  register: project_hostname
+  changed_when: false
+  failed_when: project_hostname.stdout != 'web01-hz'
+
+- name: Create only project release directories
+  ansible.builtin.file:
+    path: '{{ item.path }}'
+    state: directory
+    owner: root
+    group: root
+    mode: '{{ item.mode }}'
+  loop:
+    - {path: /opt/webops/releases, mode: '0755'}
+    - {path: /var/lib/webops-release, mode: '0700'}
+    - {path: /var/lib/webops-release/incoming, mode: '0700'}
+    - {path: /var/lib/webops-release/versions, mode: '0700'}
+    - {path: /var/lib/webops-release/attempts, mode: '0700'}

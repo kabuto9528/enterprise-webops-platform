@@ -1,0 +1,18 @@
+---
+- name: Reconcile only the restricted monitor01 cloud metrics tunnel
+  hosts: monitor01
+  connection: local
+  gather_facts: false
+  become: true
+  pre_tasks:
+    - name: Require the intended monitor and private cloud endpoint
+      ansible.builtin.assert:
+        that:
+          - inventory_hostname == 'monitor01'
+          - ansible_user == 'monitor'
+          - metrics_cloud_host is match('^100\\.(6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])\\.[0-9]{1,3}\\.[0-9]{1,3}$')
+          - metrics_cloud_host_key_alias == 'webops-cloud-pinned'
+          - metrics_tunnel_key_source == '/var/lib/webops-metrics-tunnel/.ssh/id_ed25519'
+          - metrics_cloud_known_hosts_source == '/var/lib/webops-metrics-tunnel/.ssh/known_hosts'
+  roles:
+    - metrics_tunnel_client

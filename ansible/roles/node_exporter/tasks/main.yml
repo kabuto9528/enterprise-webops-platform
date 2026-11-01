@@ -1,0 +1,114 @@
+---
+- name: Validate the approved listen address
+  ansible.builtin.assert:
+    that:
+      - node_exporter_listen is match('^(127\.0\.0\.1|[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+):9100$')
+      - not node_exporter_listen.startswith('0.0.0.0:')
+
+- name: Verify locked controller archive
+  ansible.builtin.stat:
+    path: '{{ node_exporter_archive }}'
+    checksum_algorithm: sha256
+  delegate_to: localhost
+  become: false
+  register: exporter_archive
+
+- name: Require the official archive digest
+  ansible.builtin.assert:
+    that:
+      - exporter_archive.stat.exists
+      - exporter_archive.stat.checksum == node_exporter_sha256
+
+- name: Manage the reviewed ops01 source-specific metrics rule
+  when: inventory_hostname == 'ops01'
+  block:
+    - name: Query the exact runtime rule
+      ansible.builtin.command:
+        argv:
+          - firewall-cmd
+          - --zone=public
+          - '--query-rich-rule=rule family="ipv4" source address="{{ monitor01_source_ipv4 }}/32" destination address="{{ node_exporter_listen.rsplit(":", 1)[0] }}/32" port port="9100" protocol="tcp" accept'
+      register: exporter_runtime_rule
+      failed_when: exporter_runtime_rule.rc not in [0, 1]
+      changed_when: false
+    - name: Add only the reviewed runtime rule
+      ansible.builtin.command:
+        argv:
+          - firewall-cmd
+          - --zone=public
+          - '--add-rich-rule=rule family="ipv4" source address="{{ monitor01_source_ipv4 }}/32" destination address="{{ node_exporter_listen.rsplit(":", 1)[0] }}/32" port port="9100" protocol="tcp" accept'
+      when: exporter_runtime_rule.rc == 1
+    - name: Query the verified permanent rule
+      ansible.builtin.command:
+        argv:
+          - firewall-cmd
+          - --permanent
+          - --zone=public
+          - '--query-rich-rule=rule family="ipv4" source address="{{ monitor01_source_ipv4 }}/32" destination address="{{ node_exporter_listen.rsplit(":", 1)[0] }}/32" port port="9100" protocol="tcp" accept'
+      when: node_exporter_ops_persist_verified | default(false) | bool
+      register: exporter_permanent_rule
+      failed_when: exporter_permanent_rule.rc not in [0, 1]
+      changed_when: false
+    - name: Persist only after fresh SSH and monitor scrape verification
+      ansible.builtin.command:
+        argv:
+          - firewall-cmd
+          - --permanent
+          - --zone=public
+          - '--add-rich-rule=rule family="ipv4" source address="{{ monitor01_source_ipv4 }}/32" destination address="{{ node_exporter_listen.rsplit(":", 1)[0] }}/32" port port="9100" protocol="tcp" accept'
+      when:
+        - node_exporter_ops_persist_verified | default(false) | bool
+        - exporter_permanent_rule.rc == 1
+
+- name: Create isolated exporter identity
+  ansible.builtin.user:
+    name: webops-node-exporter
+    system: true
+    create_home: false
+    home: /nonexistent
+    shell: /sbin/nologin
+
+- name: Create root-owned installation directory
+  ansible.builtin.file:
+    path: '{{ node_exporter_root }}'
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Extract the verified versioned archive
+  ansible.builtin.unarchive:
+    src: '{{ node_exporter_archive }}'
+    dest: '{{ node_exporter_root }}'
+    owner: root
+    group: root
+    creates: '{{ node_exporter_root }}/node_exporter-{{ node_exporter_version }}.linux-amd64/node_exporter'
+
+- name: Install the restricted exporter service
+  ansible.builtin.template:
+    src: webops-node-exporter.service.j2
+    dest: /etc/systemd/system/webops-node-exporter.service
+    owner: root
+    group: root
+    mode: '0644'
+    backup: true
+  notify: Restart exporter
+
+- name: Apply changed unit before health verification
+  ansible.builtin.meta: flush_handlers
+
+- name: Enable the exporter
+  ansible.builtin.systemd_service:
+    name: webops-node-exporter
+    daemon_reload: true
+    enabled: true
+    state: started
+
+- name: Verify actual local exporter response
+  ansible.builtin.uri:
+    url: 'http://{{ node_exporter_listen }}/metrics'
+    return_content: true
+    status_code: 200
+  register: exporter_metrics
+  failed_when: "'node_uname_info{' not in exporter_metrics.content"
+  no_log: true

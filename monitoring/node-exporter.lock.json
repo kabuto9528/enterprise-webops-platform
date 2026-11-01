@@ -1,0 +1,10 @@
+{
+  "version": "1.12.1",
+  "platform": "linux-amd64",
+  "archive": "node_exporter-1.12.1.linux-amd64.tar.gz",
+  "sha256": "b51d8a76aa2a9156a55d501aca6276fae09e262259a5e4e831d2c2222f084e63",
+  "release_url": "https://github.com/prometheus/node_exporter/releases/tag/v1.12.1",
+  "archive_url": "https://github.com/prometheus/node_exporter/releases/download/v1.12.1/node_exporter-1.12.1.linux-amd64.tar.gz",
+  "checksums_url": "https://github.com/prometheus/node_exporter/releases/download/v1.12.1/sha256sums.txt",
+  "verified_on": "2026-10-28"
+}

@@ -1,0 +1,199 @@
+rule_files:
+- alerts.yml
+evaluation_interval: 30s
+tests:
+- name: two-minute-window-and-real-metric-recovery
+  interval: 30s
+  input_series:
+  - series: up{job="node",node="monitor01",instance="monitor01"}
+    values: 1x40
+  - series: up{job="node",node="ops01",instance="ops01"}
+    values: 1x40
+  - series: up{job="node",node="web01-hz",instance="web01-hz"}
+    values: 1x2 0x6 1x20
+  - series: up{job="blackbox",instance="monitor01"}
+    values: 1x40
+  - series: probe_success{job="http_health",instance="web01-hz-http"}
+    values: 1x2 0x6 1x20
+  alert_rule_test:
+  - eval_time: 3m
+    alertname: NodeExporterDown
+    exp_alerts: []
+  - eval_time: 3m
+    alertname: HttpProbeFailed
+    exp_alerts: []
+  - eval_time: 3m30s
+    alertname: NodeExporterDown
+    exp_alerts:
+    - exp_labels:
+        job: node
+        node: web01-hz
+        instance: web01-hz
+        severity: critical
+        category: node-reachability
+      exp_annotations:
+        summary: 'Node metrics unavailable: web01-hz'
+  - eval_time: 3m30s
+    alertname: HttpProbeFailed
+    exp_alerts:
+    - exp_labels:
+        job: http_health
+        instance: web01-hz-http
+        node: web01-hz
+        severity: critical
+        category: http
+      exp_annotations:
+        summary: Cloud HTTP health probe failed
+  - eval_time: 5m
+    alertname: NodeExporterDown
+    exp_alerts: []
+  - eval_time: 5m
+    alertname: HttpProbeFailed
+    exp_alerts: []
+- name: short-outage-does-not-fire
+  interval: 30s
+  input_series:
+  - series: up{job="node",node="monitor01",instance="monitor01"}
+    values: 1x40
+  - series: up{job="node",node="ops01",instance="ops01"}
+    values: 1x40
+  - series: up{job="node",node="web01-hz",instance="web01-hz"}
+    values: 1x2 0x1 1x20
+  - series: up{job="blackbox",instance="monitor01"}
+    values: 1x40
+  - series: probe_success{job="http_health",instance="web01-hz-http"}
+    values: 1x40
+  alert_rule_test:
+  - eval_time: 3m30s
+    alertname: NodeExporterDown
+    exp_alerts: []
+- name: missing-target-is-detected
+  interval: 30s
+  input_series:
+  - series: up{job="node",node="monitor01",instance="monitor01"}
+    values: 1x40
+  - series: up{job="node",node="ops01",instance="ops01"}
+    values: 1x40
+  - series: up{job="blackbox",instance="monitor01"}
+    values: 1x40
+  - series: probe_success{job="http_health",instance="web01-hz-http"}
+    values: 1x40
+  alert_rule_test:
+  - eval_time: 2m
+    alertname: NodeExporterDown
+    exp_alerts:
+    - exp_labels:
+        job: node
+        node: web01-hz
+        severity: critical
+        category: node-reachability
+      exp_annotations:
+        summary: 'Node metrics unavailable: web01-hz'
+- name: memory-severity-windows-and-recovery
+  interval: 30s
+  input_series:
+  - series: up{job="node",node="monitor01",instance="monitor01"}
+    values: 1x40
+  - series: up{job="node",node="ops01",instance="ops01"}
+    values: 1x40
+  - series: up{job="node",node="web01-hz",instance="web01-hz"}
+    values: 1x40
+  - series: up{job="blackbox",instance="monitor01"}
+    values: 1x40
+  - series: probe_success{job="http_health",instance="web01-hz-http"}
+    values: 1x40
+  - series: node_memory_MemTotal_bytes{job="node",node="monitor01",instance="monitor01"}
+    values: 100x40
+  - series: node_memory_MemAvailable_bytes{job="node",node="monitor01",instance="monitor01"}
+    values: 50x2 7x11 50x20
+  alert_rule_test:
+  - eval_time: 3m30s
+    alertname: MemoryCritical
+    exp_alerts: &id001
+    - exp_labels:
+        job: node
+        node: monitor01
+        instance: monitor01
+        category: memory
+        severity: critical
+      exp_annotations:
+        summary: 'Available memory below 8%: monitor01'
+  - eval_time: 3m30s
+    alertname: MemoryLow
+    exp_alerts: []
+  - eval_time: 6m30s
+    alertname: MemoryCritical
+    exp_alerts: *id001
+  - eval_time: 6m30s
+    alertname: MemoryLow
+    exp_alerts:
+    - exp_labels:
+        job: node
+        node: monitor01
+        instance: monitor01
+        category: memory
+        severity: warning
+      exp_annotations:
+        summary: 'Available memory below 15%: monitor01'
+  - eval_time: 8m
+    alertname: MemoryCritical
+    exp_alerts: []
+  - eval_time: 8m
+    alertname: MemoryLow
+    exp_alerts: []
+- name: disk-severity-windows-and-recovery
+  interval: 30s
+  input_series:
+  - series: up{job="node",node="monitor01",instance="monitor01"}
+    values: 1x40
+  - series: up{job="node",node="ops01",instance="ops01"}
+    values: 1x40
+  - series: up{job="node",node="web01-hz",instance="web01-hz"}
+    values: 1x40
+  - series: up{job="blackbox",instance="monitor01"}
+    values: 1x40
+  - series: probe_success{job="http_health",instance="web01-hz-http"}
+    values: 1x40
+  - series: node_filesystem_size_bytes{job="node",node="monitor01",instance="monitor01",mountpoint="/",fstype="xfs"}
+    values: 100x40
+  - series: node_filesystem_avail_bytes{job="node",node="monitor01",instance="monitor01",mountpoint="/",fstype="xfs"}
+    values: 7x24 50x15
+  alert_rule_test:
+  - eval_time: 5m
+    alertname: DiskSpaceCritical
+    exp_alerts: &id002
+    - exp_labels:
+        job: node
+        node: monitor01
+        instance: monitor01
+        category: disk
+        mountpoint: /
+        fstype: xfs
+        severity: critical
+      exp_annotations:
+        summary: 'Root filesystem available space below 8%: monitor01'
+  - eval_time: 5m
+    alertname: DiskSpaceLow
+    exp_alerts: []
+  - eval_time: 10m
+    alertname: DiskSpaceCritical
+    exp_alerts: *id002
+  - eval_time: 10m
+    alertname: DiskSpaceLow
+    exp_alerts:
+    - exp_labels:
+        job: node
+        node: monitor01
+        instance: monitor01
+        category: disk
+        mountpoint: /
+        fstype: xfs
+        severity: warning
+      exp_annotations:
+        summary: 'Root filesystem available space below 15%: monitor01'
+  - eval_time: 13m
+    alertname: DiskSpaceCritical
+    exp_alerts: []
+  - eval_time: 13m
+    alertname: DiskSpaceLow
+    exp_alerts: []

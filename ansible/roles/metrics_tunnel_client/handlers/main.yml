@@ -1,0 +1,6 @@
+---
+- name: Restart metrics tunnel
+  ansible.builtin.systemd_service:
+    name: webops-metrics-tunnel
+    daemon_reload: true
+    state: restarted

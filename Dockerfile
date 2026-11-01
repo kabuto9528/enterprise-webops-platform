@@ -1,10 +1,6 @@
 ARG PYTHON_BASE
 FROM ${PYTHON_BASE}
 
-ARG WEBOPS_VERSION
-LABEL org.opencontainers.image.title="webops-app" \
-      org.opencontainers.image.revision="${WEBOPS_VERSION}"
-
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
@@ -12,11 +8,18 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 COPY requirements.txt ./requirements.txt
-RUN python -m pip install --no-cache-dir -r requirements.txt \
+COPY docker/runtime-requirements.lock.txt ./runtime-requirements.lock.txt
+RUN --mount=type=bind,from=runtime_wheels,target=/wheels \
+    python -m pip install --no-index --find-links=/wheels --only-binary=:all: \
+      --require-hashes --no-cache-dir -r runtime-requirements.lock.txt \
     && python -m pip check \
     && groupadd --gid 10001 webops-app \
     && useradd --uid 10001 --gid 10001 --no-create-home --shell /usr/sbin/nologin webops-app
 COPY app/ ./app/
+
+ARG WEBOPS_VERSION
+LABEL org.opencontainers.image.title="webops-app" \
+      org.opencontainers.image.revision="${WEBOPS_VERSION}"
 
 USER 10001:10001
 EXPOSE 8000

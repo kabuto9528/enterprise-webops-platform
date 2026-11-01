@@ -1,0 +1,5 @@
+---
+node_exporter_version: '1.12.1'
+node_exporter_sha256: b51d8a76aa2a9156a55d501aca6276fae09e262259a5e4e831d2c2222f084e63
+node_exporter_archive: '/home/ops/.cache/webops/node_exporter-{{ node_exporter_version }}.linux-amd64.tar.gz'
+node_exporter_root: /opt/webops-monitoring

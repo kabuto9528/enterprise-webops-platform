@@ -1,0 +1,17 @@
+# This Match applies only to the stage07 tunnel identity.
+Match User webops-metrics
+    AuthenticationMethods publickey
+    PasswordAuthentication no
+    KbdInteractiveAuthentication no
+    AllowTcpForwarding local
+    AllowStreamLocalForwarding no
+    PermitOpen 127.0.0.1:9100
+    PermitListen none
+    GatewayPorts no
+    AllowAgentForwarding no
+    X11Forwarding no
+    PermitTTY no
+    PermitUserRC no
+    MaxSessions 0
+    ForceCommand /sbin/nologin
+Match all

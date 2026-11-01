@@ -1,0 +1,21 @@
+---
+- name: Save the verified currently running container as the recovery baseline
+  hosts: web
+  gather_facts: false
+  vars:
+    ansible_become: true
+  tasks:
+    - name: Require explicit administrative bootstrap
+      ansible.builtin.assert:
+        that:
+          - webops_admin_confirm | default(false) | bool
+          - ansible_user != 'webops-deploy'
+          - release_sha | default('') is match('^[0-9a-f]{40}$')
+          - not ansible_check_mode
+
+    - name: Adopt only a running image whose revision and health match the SHA
+      ansible.builtin.command:
+        argv: [/usr/local/sbin/webops-release, adopt, '{{ release_sha }}']
+      async: 600
+      poll: 5
+      changed_when: true

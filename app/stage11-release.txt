@@ -1,0 +1,2 @@
+stage11 automatic healthy push acceptance — 2026-10-31
+The application version is injected from this commit's full SHA at deployment.
